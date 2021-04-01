@@ -17,17 +17,30 @@ func NewClient(endpoint string, tlsConfig *tls.Config, autoRetryCSRF bool) (*Cli
 	return &Client{}, nil
 }
 
+// Authz describes user roles/permissions.
+type Authz struct {
+	User    bool
+	Admin   bool
+	Manager bool
+}
+
 // Profile describes user profile returned by /get-user-profile.
 type Profile struct {
 	ID               ID
 	Authn            bool
+	Authz            Authz
 	IsolatedEntityID ID
 }
 
-func newProfile(userID, isolatedEntityID ID) *Profile {
+func newProfile(userID, isolatedEntityID ID, authn, user, manager, admin bool) *Profile {
 	return &Profile{
-		ID:               userID,
-		Authn:            true,
+		ID:    userID,
+		Authn: authn,
+		Authz: Authz{
+			User:    user,
+			Manager: manager,
+			Admin:   admin,
+		},
 		IsolatedEntityID: isolatedEntityID,
 	}
 }
@@ -35,22 +48,7 @@ func newProfile(userID, isolatedEntityID ID) *Profile {
 // GetUserProfile gets a cookie with the userID and isolatedEntityID separated by a dot(.) and returns a profile with the values from the cookie.
 // Authn is always true.
 func (c *Client) GetUserProfile(ctx context.Context, rawCookies string) (*Profile, error) {
-	cookie := parseCookieRaw(rawCookies)
-	idStrs := strings.SplitN(cookie, ".", 2)
-
-	var ids []ID
-	for i := range idStrs {
-		id, err := ParseID(idStrs[i])
-		if err != nil {
-			id = NewID()
-		}
-		ids = append(ids, id)
-	}
-	if len(ids) == 1 {
-		ids = append(ids, NewID())
-	}
-
-	return newProfile(ids[0], ids[1]), nil
+	return parseCookie(parseCookieRaw(rawCookies)), nil
 }
 
 func parseCookieRaw(rawCookies string) string {
@@ -64,4 +62,38 @@ func parseCookieRaw(rawCookies string) string {
 	}
 
 	return cookieKey.Value
+}
+
+func parseCookie(cookie string) *Profile {
+	idStrs := strings.SplitN(cookie, ".", 3)
+
+	var userID, isoEntityID ID
+	var authn, user, manager, admin bool
+	var err error
+	if len(idStrs) > 0 {
+		userID, err = ParseID(idStrs[0])
+		if err != nil {
+			userID = NewID()
+		}
+		if len(idStrs) > 1 {
+			isoEntityID, err = ParseID(idStrs[1])
+			if err != nil {
+				isoEntityID = NewID()
+			}
+			if len(idStrs) > 2 {
+				switch idStrs[2] {
+				case "manager":
+					manager = true
+				case "admin":
+					admin = true
+				}
+			}
+		} else {
+			isoEntityID = NewID()
+		}
+		authn = true
+		user = true
+	}
+
+	return newProfile(userID, isoEntityID, authn, user, manager, admin)
 }
