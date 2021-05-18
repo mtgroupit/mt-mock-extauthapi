@@ -30,6 +30,8 @@ type Profile struct {
 	Authn            bool
 	Authz            Authz
 	IsolatedEntityID ID
+	DepartmentID     int
+	DepartmentName   string
 }
 
 func newProfile(userID, isolatedEntityID ID, authn, user, manager, admin bool) *Profile {
