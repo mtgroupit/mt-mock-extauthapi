@@ -4,6 +4,7 @@ package extauthapi
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -98,4 +99,12 @@ func parseCookie(cookie string) *Profile {
 	}
 
 	return newProfile(userID, isoEntityID, authn, user, manager, admin)
+}
+
+// Validate return nil if token is valid
+func (c *Client) Validate(ctx context.Context, token, remoteIP string) error {
+	if len(token) < 1 || len(token) > 1000 {
+		return errors.New("Token defective")
+	}
+	return nil
 }
